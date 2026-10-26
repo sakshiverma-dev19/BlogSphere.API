@@ -56,6 +56,27 @@ BlogSphere API is a backend application designed to manage blog posts, user auth
 
 
 
+## API Endpoints
+
+### Authentication
+- POST `/api/Auth/register` — Register a new user
+- POST `/api/Auth/login` — Log in and receive a JWT token
+
+### Posts
+- GET `/api/Posts` — Retrieve posts
+- GET `/api/Posts/{id}` — Retrieve a post by ID
+- POST `/api/Posts` — Create a post (authentication required)
+- PUT `/api/Posts/{id}` — Update a post (authentication required)
+- DELETE `/api/Posts/{id}` — Delete a post (authentication required)
+
+### Comments
+- GET `/api/Comments` — Retrieve comments
+- GET `/api/Comments?post_id={postId}` — Retrieve comments for a post
+- POST `/api/Comments` — Create a comment (authentication required)
+- PUT `/api/Comments/{id}` — Update a comment (authentication required)
+- DELETE `/api/Comments/{id}` — Delete a comment (authentication required)
+
+
 \## Project Structure
 
 
