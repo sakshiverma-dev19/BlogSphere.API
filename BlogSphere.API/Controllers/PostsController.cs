@@ -1,5 +1,4 @@
-﻿
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using BlogSphere.API.Data;
 using BlogSphere.API.Models;
@@ -10,7 +9,6 @@ namespace BlogSphere.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
     public class PostsController : ControllerBase
     {
         private readonly BlogSphereDbContext _context;
@@ -20,6 +18,7 @@ namespace BlogSphere.API.Controllers
             _context = context;
         }
 
+        // GET: api/Posts/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetPostById(int id)
         {
@@ -34,6 +33,7 @@ namespace BlogSphere.API.Controllers
             return Ok(post);
         }
 
+        // GET: api/Posts
         [HttpGet]
         public async Task<IActionResult> GetPosts()
         {
@@ -42,10 +42,13 @@ namespace BlogSphere.API.Controllers
             return Ok(posts);
         }
 
+        // POST: api/Posts
+        [Authorize]
         [HttpPost]
         public async Task<IActionResult> CreatePost(Post post)
         {
-            if (string.IsNullOrWhiteSpace(post.Title) ||
+            if (post == null ||
+                string.IsNullOrWhiteSpace(post.Title) ||
                 string.IsNullOrWhiteSpace(post.Content))
             {
                 return BadRequest("Title and Content are required.");
@@ -53,12 +56,11 @@ namespace BlogSphere.API.Controllers
 
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
 
-            if (userIdClaim == null)
+            if (userIdClaim == null ||
+                !int.TryParse(userIdClaim.Value, out int currentUserId))
             {
                 return Unauthorized();
             }
-
-            int currentUserId = int.Parse(userIdClaim.Value);
 
             var authorExists = await _context.Users
                 .AnyAsync(u => u.Id == currentUserId);
@@ -83,9 +85,18 @@ namespace BlogSphere.API.Controllers
                 post);
         }
 
+        // PUT: api/Posts/{id}
+        [Authorize]
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdatePost(int id, Post updatedPost)
+        public async Task<IActionResult> UpdatePost(
+            int id,
+            Post updatedPost)
         {
+            if (updatedPost == null)
+            {
+                return BadRequest("Post data is required.");
+            }
+
             if (id != updatedPost.Id && updatedPost.Id != 0)
             {
                 return BadRequest(
@@ -101,12 +112,11 @@ namespace BlogSphere.API.Controllers
 
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
 
-            if (userIdClaim == null)
+            if (userIdClaim == null ||
+                !int.TryParse(userIdClaim.Value, out int currentUserId))
             {
                 return Unauthorized();
             }
-
-            int currentUserId = int.Parse(userIdClaim.Value);
 
             if (post.AuthorId != currentUserId)
             {
@@ -128,6 +138,8 @@ namespace BlogSphere.API.Controllers
             return Ok(post);
         }
 
+        // DELETE: api/Posts/{id}
+        [Authorize]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeletePost(int id)
         {
@@ -140,12 +152,11 @@ namespace BlogSphere.API.Controllers
 
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
 
-            if (userIdClaim == null)
+            if (userIdClaim == null ||
+                !int.TryParse(userIdClaim.Value, out int currentUserId))
             {
                 return Unauthorized();
             }
-
-            int currentUserId = int.Parse(userIdClaim.Value);
 
             if (post.AuthorId != currentUserId)
             {

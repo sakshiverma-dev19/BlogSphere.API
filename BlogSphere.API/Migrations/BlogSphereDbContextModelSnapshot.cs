@@ -52,7 +52,7 @@ namespace BlogSphere.API.Migrations
 
                     b.HasIndex("PostId");
 
-                    b.ToTable("Comments");
+                    b.ToTable("Comments", (string)null);
                 });
 
             modelBuilder.Entity("BlogSphere.API.Models.Post", b =>
@@ -84,7 +84,7 @@ namespace BlogSphere.API.Migrations
 
                     b.HasIndex("AuthorId");
 
-                    b.ToTable("Posts");
+                    b.ToTable("Posts", (string)null);
                 });
 
             modelBuilder.Entity("BlogSphere.API.Models.User", b =>
@@ -112,7 +112,7 @@ namespace BlogSphere.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("BlogSphere.API.Models.Comment", b =>

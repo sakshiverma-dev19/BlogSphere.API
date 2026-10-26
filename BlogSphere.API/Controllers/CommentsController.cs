@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using BlogSphere.API.Data;
+using BlogSphere.API.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,7 +9,6 @@ namespace BlogSphere.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
     public class CommentsController : ControllerBase
     {
         private readonly BlogSphereDbContext _context;
@@ -18,7 +18,7 @@ namespace BlogSphere.API.Controllers
             _context = context;
         }
 
-
+        // GET: api/Comments/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetCommentById(int id)
         {
@@ -33,6 +33,7 @@ namespace BlogSphere.API.Controllers
             return Ok(comment);
         }
 
+        // GET: api/Comments?post_id=1
         [HttpGet]
         public async Task<IActionResult> GetComments(int? post_id)
         {
@@ -42,11 +43,14 @@ namespace BlogSphere.API.Controllers
 
             return Ok(comments);
         }
+
+        // POST: api/Comments
+        [Authorize]
         [HttpPost]
-        public async Task<IActionResult> CreateComment(
-            BlogSphere.API.Models.Comment comment)
+        public async Task<IActionResult> CreateComment(Comment comment)
         {
-            if (string.IsNullOrWhiteSpace(comment.Content))
+            if (comment == null ||
+                string.IsNullOrWhiteSpace(comment.Content))
             {
                 return BadRequest("Comment content is required.");
             }
@@ -91,14 +95,22 @@ namespace BlogSphere.API.Controllers
                 comment);
         }
 
+        // PUT: api/Comments/{id}
+        [Authorize]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateComment(
-    int id,
-    BlogSphere.API.Models.Comment updatedComment)
+            int id,
+            Comment updatedComment)
         {
+            if (updatedComment == null)
+            {
+                return BadRequest("Comment data is required.");
+            }
+
             if (id != updatedComment.Id && updatedComment.Id != 0)
             {
-                return BadRequest("Comment ID in URL and body must match.");
+                return BadRequest(
+                    "Comment ID in URL and body must match.");
             }
 
             var comment = await _context.Comments.FindAsync(id);
@@ -108,15 +120,13 @@ namespace BlogSphere.API.Controllers
                 return NotFound("Comment not found.");
             }
 
-
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
 
-            if (userIdClaim == null)
+            if (userIdClaim == null ||
+                !int.TryParse(userIdClaim.Value, out int currentUserId))
             {
                 return Unauthorized();
             }
-
-            int currentUserId = int.Parse(userIdClaim.Value);
 
             if (comment.AuthorId != currentUserId)
             {
@@ -136,6 +146,8 @@ namespace BlogSphere.API.Controllers
             return Ok(comment);
         }
 
+        // DELETE: api/Comments/{id}
+        [Authorize]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteComment(int id)
         {
@@ -146,15 +158,13 @@ namespace BlogSphere.API.Controllers
                 return NotFound("Comment not found.");
             }
 
-
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
 
-            if (userIdClaim == null)
+            if (userIdClaim == null ||
+                !int.TryParse(userIdClaim.Value, out int currentUserId))
             {
                 return Unauthorized();
             }
-
-            int currentUserId = int.Parse(userIdClaim.Value);
 
             if (comment.AuthorId != currentUserId)
             {
@@ -165,7 +175,6 @@ namespace BlogSphere.API.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
-        } 
-        
+        }
     }
 }
