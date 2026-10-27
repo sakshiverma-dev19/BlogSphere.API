@@ -151,15 +151,8 @@ Run the following command from the solution folder:
 dotnet test
 ```
 
-## Future Improvements
-
-- Add pagination and filtering for blog posts
-- Expand automated test coverage
-- Improve validation and error handling
-- Add example request and response payloads
-
 ## Author
 
 Sakshi Verma
 
-GitHub: https://github.com/sakshiverma-dev19
+GitHub: [https://github.com/sakshiverma-dev19](https://github.com/sakshiverma-dev19)
