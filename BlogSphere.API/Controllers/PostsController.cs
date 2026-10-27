@@ -1,7 +1,8 @@
-﻿using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
+﻿
+using System.Security.Claims;
 using BlogSphere.API.Data;
 using BlogSphere.API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,10 +20,16 @@ namespace BlogSphere.API.Controllers
         }
 
         // GET: api/Posts/{id}
-        [HttpGet("{id}")]
+        [HttpGet("{id:int}")]
         public async Task<IActionResult> GetPostById(int id)
         {
+            if (id <= 0)
+            {
+                return BadRequest("Invalid post ID.");
+            }
+
             var post = await _context.Posts
+                .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (post == null)
@@ -37,7 +44,10 @@ namespace BlogSphere.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetPosts()
         {
-            var posts = await _context.Posts.ToListAsync();
+            var posts = await _context.Posts
+                .AsNoTracking()
+                .OrderByDescending(p => p.CreatedAt)
+                .ToListAsync();
 
             return Ok(posts);
         }
@@ -45,16 +55,35 @@ namespace BlogSphere.API.Controllers
         // POST: api/Posts
         [Authorize]
         [HttpPost]
-        public async Task<IActionResult> CreatePost(Post post)
+        public async Task<IActionResult> CreatePost(
+            [FromBody] Post post)
         {
-            if (post == null ||
-                string.IsNullOrWhiteSpace(post.Title) ||
-                string.IsNullOrWhiteSpace(post.Content))
+            if (post == null)
             {
-                return BadRequest("Title and Content are required.");
+                return BadRequest("Post data is required.");
             }
 
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(post.Title))
+            {
+                return BadRequest("Title is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(post.Content))
+            {
+                return BadRequest("Content is required.");
+            }
+
+            post.Title = post.Title.Trim();
+            post.Content = post.Content.Trim();
+
+            if (post.Title.Length > 200)
+            {
+                return BadRequest(
+                    "Title cannot exceed 200 characters.");
+            }
+
+            var userIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
 
             if (userIdClaim == null ||
                 !int.TryParse(userIdClaim.Value, out int currentUserId))
@@ -67,7 +96,7 @@ namespace BlogSphere.API.Controllers
 
             if (!authorExists)
             {
-                return BadRequest("Logged-in user does not exist.");
+                return Unauthorized();
             }
 
             post.Id = 0;
@@ -87,30 +116,57 @@ namespace BlogSphere.API.Controllers
 
         // PUT: api/Posts/{id}
         [Authorize]
-        [HttpPut("{id}")]
+        [HttpPut("{id:int}")]
         public async Task<IActionResult> UpdatePost(
             int id,
-            Post updatedPost)
+            [FromBody] Post updatedPost)
         {
+            if (id <= 0)
+            {
+                return BadRequest("Invalid post ID.");
+            }
+
             if (updatedPost == null)
             {
                 return BadRequest("Post data is required.");
             }
 
-            if (id != updatedPost.Id && updatedPost.Id != 0)
+            if (updatedPost.Id != 0 &&
+                id != updatedPost.Id)
             {
                 return BadRequest(
                     "Post ID in URL and body must match.");
             }
 
-            var post = await _context.Posts.FindAsync(id);
+            if (string.IsNullOrWhiteSpace(updatedPost.Title))
+            {
+                return BadRequest("Title is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(updatedPost.Content))
+            {
+                return BadRequest("Content is required.");
+            }
+
+            updatedPost.Title = updatedPost.Title.Trim();
+            updatedPost.Content = updatedPost.Content.Trim();
+
+            if (updatedPost.Title.Length > 200)
+            {
+                return BadRequest(
+                    "Title cannot exceed 200 characters.");
+            }
+
+            var post = await _context.Posts
+                .FirstOrDefaultAsync(p => p.Id == id);
 
             if (post == null)
             {
                 return NotFound("Post not found.");
             }
 
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            var userIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
 
             if (userIdClaim == null ||
                 !int.TryParse(userIdClaim.Value, out int currentUserId))
@@ -121,12 +177,6 @@ namespace BlogSphere.API.Controllers
             if (post.AuthorId != currentUserId)
             {
                 return Forbid();
-            }
-
-            if (string.IsNullOrWhiteSpace(updatedPost.Title) ||
-                string.IsNullOrWhiteSpace(updatedPost.Content))
-            {
-                return BadRequest("Title and Content are required.");
             }
 
             post.Title = updatedPost.Title;
@@ -140,17 +190,24 @@ namespace BlogSphere.API.Controllers
 
         // DELETE: api/Posts/{id}
         [Authorize]
-        [HttpDelete("{id}")]
+        [HttpDelete("{id:int}")]
         public async Task<IActionResult> DeletePost(int id)
         {
-            var post = await _context.Posts.FindAsync(id);
+            if (id <= 0)
+            {
+                return BadRequest("Invalid post ID.");
+            }
+
+            var post = await _context.Posts
+                .FirstOrDefaultAsync(p => p.Id == id);
 
             if (post == null)
             {
                 return NotFound("Post not found.");
             }
 
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            var userIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
 
             if (userIdClaim == null ||
                 !int.TryParse(userIdClaim.Value, out int currentUserId))

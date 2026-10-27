@@ -1,9 +1,13 @@
 ﻿
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using BlogSphere.API.Data;
 using BlogSphere.API.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 namespace BlogSphere.API.Controllers
 {
@@ -13,36 +17,71 @@ namespace BlogSphere.API.Controllers
     {
         private readonly BlogSphereDbContext _context;
         private readonly PasswordHasher<User> _passwordHasher;
+        private readonly IConfiguration _configuration;
 
-        public AuthController(BlogSphereDbContext context)
+        public AuthController(
+            BlogSphereDbContext context,
+            IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
             _passwordHasher = new PasswordHasher<User>();
         }
 
+        // POST: api/Auth/register
         [HttpPost("register")]
-        public async Task<IActionResult> Register(User user)
+        public async Task<IActionResult> Register(
+            [FromBody] User user)
         {
+            if (user == null)
+            {
+                return BadRequest("User data is required.");
+            }
+
             if (string.IsNullOrWhiteSpace(user.Username) ||
                 string.IsNullOrWhiteSpace(user.Email) ||
                 string.IsNullOrWhiteSpace(user.PasswordHash))
             {
-                return BadRequest("Username, Email and Password are required.");
+                return BadRequest(
+                    "Username, Email and Password are required.");
+            }
+
+            user.Username = user.Username.Trim();
+            user.Email = user.Email.Trim();
+
+            if (user.Username.Length > 100)
+            {
+                return BadRequest(
+                    "Username cannot exceed 100 characters.");
+            }
+
+            if (user.Email.Length > 255)
+            {
+                return BadRequest(
+                    "Email cannot exceed 255 characters.");
+            }
+
+            if (user.PasswordHash.Length < 8)
+            {
+                return BadRequest(
+                    "Password must be at least 8 characters long.");
             }
 
             bool userExists = await _context.Users.AnyAsync(
-                u => u.Email == user.Email || u.Username == user.Username);
+                u => u.Email == user.Email ||
+                     u.Username == user.Username);
 
             if (userExists)
             {
-                return BadRequest("Username or Email already exists.");
+                return Conflict("Username or Email already exists.");
             }
 
             string password = user.PasswordHash;
 
             user.Id = 0;
             user.CreatedAt = DateTime.UtcNow;
-            user.PasswordHash = _passwordHasher.HashPassword(user, password);
+            user.PasswordHash =
+                _passwordHasher.HashPassword(user, password);
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
@@ -56,22 +95,28 @@ namespace BlogSphere.API.Controllers
             });
         }
 
-
+        // POST: api/Auth/login
         [HttpPost("login")]
-        public async Task<IActionResult> Login(User loginUser)
+        public async Task<IActionResult> Login(
+            [FromBody] User loginUser)
         {
-            if (string.IsNullOrWhiteSpace(loginUser.Email) ||
+            if (loginUser == null ||
+                string.IsNullOrWhiteSpace(loginUser.Email) ||
                 string.IsNullOrWhiteSpace(loginUser.PasswordHash))
             {
-                return BadRequest("Email and Password are required.");
+                return BadRequest(
+                    "Email and Password are required.");
             }
 
+            string email = loginUser.Email.Trim();
+
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == loginUser.Email);
+                .FirstOrDefaultAsync(u => u.Email == email);
 
             if (user == null)
             {
-                return Unauthorized("Invalid email or password.");
+                return Unauthorized(
+                    "Invalid email or password.");
             }
 
             var result = _passwordHasher.VerifyHashedPassword(
@@ -81,43 +126,62 @@ namespace BlogSphere.API.Controllers
 
             if (result == PasswordVerificationResult.Failed)
             {
-                return Unauthorized("Invalid email or password.");
+                return Unauthorized(
+                    "Invalid email or password.");
             }
 
-            var key = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
-                System.Text.Encoding.UTF8.GetBytes(
-                    HttpContext.RequestServices
-                        .GetRequiredService<IConfiguration>()["Jwt:Key"]!));
+            string? jwtKey = _configuration["Jwt:Key"];
+            string? issuer = _configuration["Jwt:Issuer"];
+            string? audience = _configuration["Jwt:Audience"];
 
-            var credentials = new Microsoft.IdentityModel.Tokens.SigningCredentials(
+            if (string.IsNullOrWhiteSpace(jwtKey) ||
+                string.IsNullOrWhiteSpace(issuer) ||
+                string.IsNullOrWhiteSpace(audience))
+            {
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    "JWT configuration is missing.");
+            }
+
+            if (Encoding.UTF8.GetByteCount(jwtKey) < 32)
+            {
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    "JWT key configuration is invalid.");
+            }
+
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtKey));
+
+            var credentials = new SigningCredentials(
                 key,
-                Microsoft.IdentityModel.Tokens.SecurityAlgorithms.HmacSha256);
+                SecurityAlgorithms.HmacSha256);
 
             var claims = new[]
             {
-                new System.Security.Claims.Claim(
-                    System.Security.Claims.ClaimTypes.NameIdentifier,
+                new Claim(
+                    ClaimTypes.NameIdentifier,
                     user.Id.ToString()),
-                new System.Security.Claims.Claim(
-                    System.Security.Claims.ClaimTypes.Name,
+
+                new Claim(
+                    ClaimTypes.Name,
                     user.Username),
-                new System.Security.Claims.Claim(
-                    System.Security.Claims.ClaimTypes.Email,
+
+                new Claim(
+                    ClaimTypes.Email,
                     user.Email)
             };
 
-            var token = new System.IdentityModel.Tokens.Jwt.JwtSecurityToken(
-                issuer: HttpContext.RequestServices
-                    .GetRequiredService<IConfiguration>()["Jwt:Issuer"],
-                audience: HttpContext.RequestServices
-                    .GetRequiredService<IConfiguration>()["Jwt:Audience"],
+            var token = new JwtSecurityToken(
+                issuer: issuer,
+                audience: audience,
                 claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(60),
+             expires: DateTime.UtcNow.AddMinutes(
+    Convert.ToDouble(_configuration["Jwt:ExpiryMinutes"])),
                 signingCredentials: credentials);
 
-            var tokenString =
-                new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler()
-                    .WriteToken(token);
+            string tokenString =
+                new JwtSecurityTokenHandler().WriteToken(token);
 
             return Ok(new
             {
@@ -127,6 +191,5 @@ namespace BlogSphere.API.Controllers
                 Username = user.Username
             });
         }
-
     }
 }

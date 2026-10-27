@@ -1,7 +1,8 @@
+
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
 using BlogSphere.API.Data;
 using BlogSphere.API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,10 +20,16 @@ namespace BlogSphere.API.Controllers
         }
 
         // GET: api/Comments/{id}
-        [HttpGet("{id}")]
+        [HttpGet("{id:int}")]
         public async Task<IActionResult> GetCommentById(int id)
         {
+            if (id <= 0)
+            {
+                return BadRequest("Invalid comment ID.");
+            }
+
             var comment = await _context.Comments
+                .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == id);
 
             if (comment == null)
@@ -33,12 +40,34 @@ namespace BlogSphere.API.Controllers
             return Ok(comment);
         }
 
+        // GET: api/Comments
         // GET: api/Comments?post_id=1
         [HttpGet]
-        public async Task<IActionResult> GetComments(int? post_id)
+        public async Task<IActionResult> GetComments(
+            [FromQuery(Name = "post_id")] int? postId)
         {
-            var comments = await _context.Comments
-                .Where(c => post_id == null || c.PostId == post_id)
+            if (postId.HasValue && postId.Value <= 0)
+            {
+                return BadRequest("Invalid post ID.");
+            }
+
+            var query = _context.Comments.AsNoTracking();
+
+            if (postId.HasValue)
+            {
+                var postExists = await _context.Posts
+                    .AnyAsync(p => p.Id == postId.Value);
+
+                if (!postExists)
+                {
+                    return NotFound("Post not found.");
+                }
+
+                query = query.Where(c => c.PostId == postId.Value);
+            }
+
+            var comments = await query
+                .OrderBy(c => c.CreatedAt)
                 .ToListAsync();
 
             return Ok(comments);
@@ -47,15 +76,32 @@ namespace BlogSphere.API.Controllers
         // POST: api/Comments
         [Authorize]
         [HttpPost]
-        public async Task<IActionResult> CreateComment(Comment comment)
+        public async Task<IActionResult> CreateComment(
+            [FromBody] Comment comment)
         {
-            if (comment == null ||
-                string.IsNullOrWhiteSpace(comment.Content))
+            if (comment == null)
+            {
+                return BadRequest("Comment data is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(comment.Content))
             {
                 return BadRequest("Comment content is required.");
             }
 
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (comment.Content.Length > 1000)
+            {
+                return BadRequest(
+                    "Comment content cannot exceed 1000 characters.");
+            }
+
+            if (comment.PostId <= 0)
+            {
+                return BadRequest("A valid post ID is required.");
+            }
+
+            var userIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
 
             if (userIdClaim == null ||
                 !int.TryParse(userIdClaim.Value, out int currentUserId))
@@ -76,9 +122,10 @@ namespace BlogSphere.API.Controllers
 
             if (!authorExists)
             {
-                return BadRequest("Logged-in user does not exist.");
+                return Unauthorized();
             }
 
+            // Server controls these values.
             comment.Id = 0;
             comment.AuthorId = currentUserId;
             comment.CreatedAt = DateTime.UtcNow;
@@ -97,30 +144,49 @@ namespace BlogSphere.API.Controllers
 
         // PUT: api/Comments/{id}
         [Authorize]
-        [HttpPut("{id}")]
+        [HttpPut("{id:int}")]
         public async Task<IActionResult> UpdateComment(
             int id,
-            Comment updatedComment)
+            [FromBody] Comment updatedComment)
         {
+            if (id <= 0)
+            {
+                return BadRequest("Invalid comment ID.");
+            }
+
             if (updatedComment == null)
             {
                 return BadRequest("Comment data is required.");
             }
 
-            if (id != updatedComment.Id && updatedComment.Id != 0)
+            if (updatedComment.Id != 0 &&
+                id != updatedComment.Id)
             {
                 return BadRequest(
                     "Comment ID in URL and body must match.");
             }
 
-            var comment = await _context.Comments.FindAsync(id);
+            if (string.IsNullOrWhiteSpace(updatedComment.Content))
+            {
+                return BadRequest("Comment content is required.");
+            }
+
+            if (updatedComment.Content.Length > 1000)
+            {
+                return BadRequest(
+                    "Comment content cannot exceed 1000 characters.");
+            }
+
+            var comment = await _context.Comments
+                .FirstOrDefaultAsync(c => c.Id == id);
 
             if (comment == null)
             {
                 return NotFound("Comment not found.");
             }
 
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            var userIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
 
             if (userIdClaim == null ||
                 !int.TryParse(userIdClaim.Value, out int currentUserId))
@@ -133,12 +199,9 @@ namespace BlogSphere.API.Controllers
                 return Forbid();
             }
 
-            if (string.IsNullOrWhiteSpace(updatedComment.Content))
-            {
-                return BadRequest("Comment content is required.");
-            }
-
-            comment.Content = updatedComment.Content;
+            // Only content can be changed.
+            // PostId, AuthorId and CreatedAt remain unchanged.
+            comment.Content = updatedComment.Content.Trim();
             comment.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -148,17 +211,24 @@ namespace BlogSphere.API.Controllers
 
         // DELETE: api/Comments/{id}
         [Authorize]
-        [HttpDelete("{id}")]
+        [HttpDelete("{id:int}")]
         public async Task<IActionResult> DeleteComment(int id)
         {
-            var comment = await _context.Comments.FindAsync(id);
+            if (id <= 0)
+            {
+                return BadRequest("Invalid comment ID.");
+            }
+
+            var comment = await _context.Comments
+                .FirstOrDefaultAsync(c => c.Id == id);
 
             if (comment == null)
             {
                 return NotFound("Comment not found.");
             }
 
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            var userIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
 
             if (userIdClaim == null ||
                 !int.TryParse(userIdClaim.Value, out int currentUserId))
