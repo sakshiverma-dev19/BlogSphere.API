@@ -91,7 +91,7 @@ BlogSphere.API.Tests/
 
 ## Getting Started
 
-### 1. Clone the repository
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/sakshiverma-dev19/BlogSphere.API.git
@@ -100,7 +100,7 @@ cd BlogSphere.API
 
 Open `BlogSphere.API.sln` in Visual Studio 2022.
 
-### 2. Configure the application
+### 2. Configure the Application
 
 Configure your local database connection string under `ConnectionStrings:DefaultConnection`.
 
@@ -113,7 +113,9 @@ Configure the following JWT settings:
 
 Use a strong, private JWT key. Do not commit real secrets or database credentials to GitHub.
 
-### 3. Set up the database
+For local development, store the JWT key in .NET User Secrets rather than committing it to `appsettings.json`.
+
+### 3. Set Up the Database
 
 The repository includes `Database/BlogSphereDb.sql` as a database setup script.
 
@@ -151,8 +153,10 @@ Run the following command from the solution folder:
 dotnet test
 ```
 
+The automated test suite currently passes 22 tests.
+
 ## Author
 
 Sakshi Verma
 
-GitHub: [https://github.com/sakshiverma-dev19](https://github.com/sakshiverma-dev19)
+GitHub: [sakshiverma-dev19](https://github.com/sakshiverma-dev19)
