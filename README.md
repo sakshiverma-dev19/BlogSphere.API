@@ -123,20 +123,24 @@ For another SQL Server instance, use its actual server name.
 
 ### 3. Set Up the Database
 
-The repository includes the SQL setup script:
+This project uses Entity Framework Core migrations to create the database.
+
+1. Make sure SQL Server is running.
+2. Configure the `DefaultConnection` string in `BlogSphere.API/appsettings.json`.
+3. Open the terminal in the solution folder.
+4. Run this command:
+
+```bash
+dotnet ef database update --project BlogSphere.API --startup-project BlogSphere.API
+```
+This command creates the BlogSphereDb database and the required tables.
+
+The repository also includes an SQL setup script for reference:
 
 `BlogSphere.API/Database/BlogSphereDb.sql`
 
-To create the database:
-
-1. Open SQL Server Management Studio (SSMS).
-2. Connect to your SQL Server instance.
-3. Open `BlogSphereDb.sql`.
-4. Execute the script if it matches the current database schema.
-
-Alternatively, use Entity Framework Core migrations if they are up to date.
-
-Do not run both the SQL script and migrations blindly against the same database. Choose the intended setup method.
+Use either EF Core migrations or the SQL script to create a new database. 
+Do not run both methods on the same database.
 
 ### 4. Configure JWT Authentication
 
