@@ -9,7 +9,7 @@ BlogSphere API is a backend application for managing users, blog posts, and comm
 ## Technologies Used
 
 - C#
-- ASP.NET Core Web API
+- ASP.NET Core Web API (.NET 8)
 - Entity Framework Core
 - SQL Server
 - JWT Authentication
@@ -84,14 +84,19 @@ BlogSphere.API.Tests/
 
 ## Prerequisites
 
+Before running this project, install:
+
 - .NET 8 SDK
 - Visual Studio 2022
-- SQL Server / SQL Server Express
+- SQL Server or SQL Server Express
+- SQL Server Management Studio (SSMS)
 - Git
 
 ## Getting Started
 
 ### 1. Clone the Repository
+
+Open a terminal and run:
 
 ```bash
 git clone https://github.com/sakshiverma-dev19/BlogSphere.API.git
@@ -100,42 +105,88 @@ cd BlogSphere.API
 
 Open `BlogSphere.API.sln` in Visual Studio 2022.
 
-### 2. Configure the Application
+### 2. Configure the Database Connection
 
-Configure your local database connection string under `ConnectionStrings:DefaultConnection`.
+Open:
 
-Configure the following JWT settings:
+`BlogSphere.API/appsettings.json`
+
+Find the `DefaultConnection` setting and replace `YOUR_SQL_SERVER_NAME` with your local SQL Server instance name.
+
+Example connection string for SQL Server Express:
+
+```text
+Server=.\SQLEXPRESS;Database=BlogSphereDb;Trusted_Connection=True;TrustServerCertificate=True;
+```
+
+For another SQL Server instance, use its actual server name.
+
+### 3. Set Up the Database
+
+The repository includes the SQL setup script:
+
+`BlogSphere.API/Database/BlogSphereDb.sql`
+
+To create the database:
+
+1. Open SQL Server Management Studio (SSMS).
+2. Connect to your SQL Server instance.
+3. Open `BlogSphereDb.sql`.
+4. Execute the script if it matches the current database schema.
+
+Alternatively, use Entity Framework Core migrations if they are up to date.
+
+Do not run both the SQL script and migrations blindly against the same database. Choose the intended setup method.
+
+### 4. Configure JWT Authentication
+
+The application requires these JWT settings:
 
 - `Jwt:Key`
 - `Jwt:Issuer`
 - `Jwt:Audience`
 - `Jwt:ExpiryMinutes`
 
-Use a strong, private JWT key. Do not commit real secrets or database credentials to GitHub.
+The Issuer, Audience, and ExpiryMinutes settings are available in `appsettings.json`.
 
-For local development, store the JWT key in .NET User Secrets rather than committing it to `appsettings.json`.
+For local development, configure the JWT key using .NET User Secrets.
 
-### 3. Set Up the Database
+From the `BlogSphere.API` project directory, run:
 
-The repository includes `Database/BlogSphereDb.sql` as a database setup script.
+```bash
+dotnet user-secrets init
+dotnet user-secrets set "Jwt:Key" "YOUR_PRIVATE_LONG_RANDOM_SECRET_KEY"
+```
 
-Run the SQL script in SQL Server Management Studio (SSMS) if it matches the current database schema. Alternatively, use Entity Framework Core migrations if the project migrations are up to date.
+Use your own strong secret key. Never commit real JWT keys, passwords, or private credentials to GitHub.
 
-Do not apply migrations and the SQL script blindly to the same database. Confirm the intended setup method first.
+### 5. Restore Dependencies
 
-### 4. Run the API
+Open a terminal in the solution folder and run:
 
-Run the `BlogSphere.API` project from Visual Studio.
+```bash
+dotnet restore
+```
 
-In the Development environment, open Swagger UI at:
+### 6. Run the API
+
+In Visual Studio:
+
+1. Set `BlogSphere.API` as the startup project.
+2. Select the HTTPS launch profile.
+3. Click Run.
+
+Swagger UI will be available at:
 
 `https://localhost:{port}/swagger`
 
 Replace `{port}` with the HTTPS port configured for your application.
 
-## Authentication
+### 7. Authentication
 
-Register or log in using the authentication endpoints. The login endpoint returns a JWT token.
+Register or log in using the authentication endpoints.
+
+The login endpoint returns a JWT token.
 
 For protected endpoints, include the token in the request header:
 
@@ -143,20 +194,22 @@ For protected endpoints, include the token in the request header:
 Authorization: Bearer YOUR_JWT_TOKEN
 ```
 
-In Swagger UI, select **Authorize** and enter your token as instructed by the Swagger interface.
+In Swagger UI, click **Authorize** and enter your token as instructed by the Swagger interface.
 
 ## Running Tests
 
-Run the following command from the solution folder:
+Open a terminal in the solution folder and run:
 
 ```bash
 dotnet test
 ```
 
-The automated test suite currently passes 22 tests.
+This command builds the solution and runs the automated tests.
+
+All tests should pass before deployment.
 
 ## Author
 
-Sakshi Verma
+**Sakshi Verma**
 
 GitHub: [sakshiverma-dev19](https://github.com/sakshiverma-dev19)
